@@ -1,90 +1,99 @@
-/// Define las modalidades de precio aplicables a cada pedido.
+/// Modalidad de precio aplicable a un pedido.
 enum TipoTarifa {
-  /// Tarifa estándar aplicada a compradores individuales.
+  /// Venta directa al público general.
   publico,
 
-  /// Tarifa mayoreo tiendas y revendedores.
+  /// Venta a tiendas o revendedores con precio preferencial.
   tienda,
 }
 
-/// Representa un pedido individual de tamales dentro del punto de venta.
+/// Representa un pedido individual, una devolución de mercancía o una orden cancelada.
 ///
-/// Almacena las cantidades solicitadas por sabor, congela los precios unitarios
-/// vigentes y controla el estado de entrega, pago y ciclo semanal.
+/// Congela los precios unitarios vigentes al momento de registrarse para que
+/// cambios futuros en [ConfiguracionPrecios] no alteren el historial ni los
+/// cortes semanales.
 class Pedido {
-  /// Identificador único del pedido.
+  /// Identificador único del movimiento.
   final String id;
 
-  /// Nombre del cliente particular o de la tienda que realiza el encargo.
+  /// Nombre del cliente o tienda (`'Mostrador'` por defecto).
   final String cliente;
 
-  /// Modalidad de tarifa aplicada ([TipoTarifa.publico] o [TipoTarifa.tienda]).
+  /// Modalidad de precio aplicada al movimiento.
   final TipoTarifa tarifa;
 
-  /// Cantidad de tamales de puerco incluidos en el pedido.
+  /// Cantidad de tamales de puerco involucrados en el movimiento.
   final int cantidadPuerco;
 
-  /// Cantidad de tamales de elote incluidos en el pedido.
+  /// Cantidad de tamales de elote involucrados en el movimiento.
   final int cantidadElote;
 
-  /// Precio unitario del tamal de puerco congelado al crear el pedido.
+  /// Precio unitario aplicado por cada pieza de puerco.
   final double precioPuercoAplicado;
 
-  /// Precio unitario del tamal de elote congelado al crear el pedido.
+  /// Precio unitario aplicado por cada pieza de elote.
   final double precioEloteAplicado;
 
-  /// Marca de tiempo exacta en la que se capturó el pedido en la aplicación.
+  /// Fecha y hora exacta en que se registró el movimiento.
   final DateTime horaRegistro;
 
-  /// Fecha y hora programada para entregar el pedido.
-  ///
-  /// Cuando es `null`, indica que el pedido es para entrega inmediata.
+  /// Hora programada de entrega (`null` si es entrega inmediata).
   final DateTime? horaEntrega;
 
-  /// Indica si los tamales ya fueron entregados al cliente o tienda.
+  /// Fecha y hora exacta en que el pedido fue marcado como entregado (`null` si aún no se entrega).
+  final DateTime? horaEntregadoReal;
+
+  /// Indica si la mercancía ya fue entregada físicamente.
   final bool entregado;
 
-  /// Indica si el importe total del pedido ya fue liquidado.
+  /// Indica si el pedido ya fue cobrado o la devolución ya fue aplicada a un corte.
   final bool pagado;
 
-  /// Identificador del ciclo semanal al que pertenece el pedido.
-  ///
-  /// Toma el valor `'actual'` mientras la semana sigue abierta y se actualiza
-  /// con la fecha de cierre (por ejemplo, `'2026-11-16'`) al realizar el corte.
+  /// Identificador de la semana contable (`'actual'` mientras siga abierta).
   final String semanaId;
+
+  /// Indica si este registro corresponde a una devolución de mercancía (`true`)
+  /// que resta saldo al cliente sin borrar sus pedidos originales.
+  final bool esDevolucion;
+
+  /// Indica si el pedido fue cancelado (`true`), conservándose en el historial
+  /// con impacto monetario cero (`0.0`).
+  final bool cancelado;
 
   /// Crea una instancia inmutable de [Pedido].
   const Pedido({
     required this.id,
     required this.cliente,
     required this.tarifa,
-    this.cantidadPuerco = 0,
-    this.cantidadElote = 0,
+    required this.cantidadPuerco,
+    required this.cantidadElote,
     required this.precioPuercoAplicado,
     required this.precioEloteAplicado,
     required this.horaRegistro,
     this.horaEntrega,
+    this.horaEntregadoReal,
     this.entregado = false,
     this.pagado = false,
     this.semanaId = 'actual',
+    this.esDevolucion = false,
+    this.cancelado = false,
   });
 
-  /// Indica si el pedido requiere entrega inmediata ([horaEntrega] es `null`).
-  bool get esInmediato => horaEntrega == null;
+  /// Suma total de piezas incluidas en el movimiento.
+  int get totalPiezas => cantidadPuerco + cantidadElote;
 
-  /// Suma total de piezas de tamales en el pedido
-  /// ([cantidadPuerco] + [cantidadElote]).
-  int get totalTamales => cantidadPuerco + cantidadElote;
-
-  /// Importe monetario total del pedido calculado con los precios congelados.
-  double get totalPesos =>
+  /// Importe monetario bruto de las piezas (`>= 0`).
+  double get importeBruto =>
       (cantidadPuerco * precioPuercoAplicado) +
       (cantidadElote * precioEloteAplicado);
 
-  /// Devuelve una nueva instancia reemplazando únicamente los campos indicados.
-  ///
-  /// Si [limpiarHoraEntrega] es `true`, convierte el pedido a entrega inmediata
-  /// forzando [horaEntrega] a `null`.
+  /// Impacto monetario neto (`0.0` si está [cancelado], negativo si [esDevolucion]).
+  double get totalPesos {
+    if (cancelado) return 0.0;
+    return esDevolucion ? -importeBruto : importeBruto;
+  }
+
+  /// Devuelve una copia modificando únicamente los campos especificados.
   Pedido copyWith({
     String? id,
     String? cliente,
@@ -96,9 +105,13 @@ class Pedido {
     DateTime? horaRegistro,
     DateTime? horaEntrega,
     bool limpiarHoraEntrega = false,
+    DateTime? horaEntregadoReal,
+    bool limpiarHoraEntregadoReal = false,
     bool? entregado,
     bool? pagado,
     String? semanaId,
+    bool? esDevolucion,
+    bool? cancelado,
   }) {
     return Pedido(
       id: id ?? this.id,
@@ -112,14 +125,18 @@ class Pedido {
       horaEntrega: limpiarHoraEntrega
           ? null
           : (horaEntrega ?? this.horaEntrega),
+      horaEntregadoReal: limpiarHoraEntregadoReal
+          ? null
+          : (horaEntregadoReal ?? this.horaEntregadoReal),
       entregado: entregado ?? this.entregado,
       pagado: pagado ?? this.pagado,
       semanaId: semanaId ?? this.semanaId,
+      esDevolucion: esDevolucion ?? this.esDevolucion,
+      cancelado: cancelado ?? this.cancelado,
     );
   }
 
-  /// Serializa el pedido a un mapa clave-valor compatible con bases de datos
-  /// en la nube (Supabase).
+  /// Serializa el movimiento a un mapa clave-valor para Supabase.
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -131,20 +148,24 @@ class Pedido {
       'precioEloteAplicado': precioEloteAplicado,
       'horaRegistro': horaRegistro.toIso8601String(),
       'horaEntrega': horaEntrega?.toIso8601String(),
+      'horaEntregadoReal': horaEntregadoReal?.toIso8601String(),
       'entregado': entregado,
       'pagado': pagado,
       'semanaId': semanaId,
+      'esDevolucion': esDevolucion,
+      'cancelado': cancelado,
     };
   }
 
-  /// Reconstruye una instancia de [Pedido] a partir de un [map].
+  /// Reconstruye un [Pedido] a partir de un mapa proveniente de Supabase.
   factory Pedido.fromMap(Map<String, dynamic> map) {
     return Pedido(
       id: map['id'] ?? '',
       cliente: map['cliente'] ?? 'Mostrador',
-      tarifa: map['tarifa'] == 'tienda'
-          ? TipoTarifa.tienda
-          : TipoTarifa.publico,
+      tarifa: TipoTarifa.values.firstWhere(
+        (t) => t.name == map['tarifa'],
+        orElse: () => TipoTarifa.publico,
+      ),
       cantidadPuerco: map['cantidadPuerco'] ?? 0,
       cantidadElote: map['cantidadElote'] ?? 0,
       precioPuercoAplicado: (map['precioPuercoAplicado'] ?? 0).toDouble(),
@@ -153,9 +174,14 @@ class Pedido {
       horaEntrega: map['horaEntrega'] != null
           ? DateTime.parse(map['horaEntrega'])
           : null,
+      horaEntregadoReal: map['horaEntregadoReal'] != null
+          ? DateTime.parse(map['horaEntregadoReal'])
+          : null,
       entregado: map['entregado'] ?? false,
       pagado: map['pagado'] ?? false,
       semanaId: map['semanaId'] ?? 'actual',
+      esDevolucion: map['esDevolucion'] ?? false,
+      cancelado: map['cancelado'] ?? false,
     );
   }
 }

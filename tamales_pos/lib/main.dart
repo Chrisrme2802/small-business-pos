@@ -1,121 +1,273 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
-  runApp(const MyApp());
+import 'controllers/pos_controller.dart';
+import 'models/configuracion_precios.dart';
+import 'screens/operacion_screen.dart';
+import 'screens/resumen_screen.dart';
+import 'screens/tomar_pedido_screen.dart';
+import 'widgets/titulo_marcador.dart';
+
+/// Punto de entrada principal de la aplicación **Tamales POS**.
+///
+/// Inicializa el formato regional en español de México (`es_MX`), conecta el
+/// cliente de Supabase e inyecta una instancia global de [PosController].
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('es_MX');
+
+  await Supabase.initialize(
+    url: 'https://zmzampibkpaiqcgbpoqy.supabase.co',
+    anonKey: 'sb_publishable__CURo0QAxdo6VvDactryww_69hTXrYW',
+  );
+
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => PosController(),
+      child: const TamalesApp(),
+    ),
+  );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+/// Widget raíz que configura el tema Material 3 y alterna entre la pantalla
+/// de carga inicial y la interfaz principal del punto de venta.
+class TamalesApp extends StatelessWidget {
+  /// Crea una instancia de [TamalesApp].
+  const TamalesApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Tamales POS',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+        colorSchemeSeed: colorMarcador,
+        scaffoldBackgroundColor: Colors.white,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: Consumer<PosController>(
+        builder: (context, controller, _) {
+          if (controller.estaCargando) {
+            return const _PantallaCarga();
+          }
+          return const Shell();
+        },
+      ),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
+/// Pantalla de carga inicial mostrada mientras [PosController] descarga
+/// tarifas, inventario y pedidos desde Supabase.
+class _PantallaCarga extends StatelessWidget {
+  const _PantallaCarga();
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
+      backgroundColor: const Color(0xFFFFFBEF),
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('You have pushed the button this many times:'),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD9F99D),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.black87, width: 1.5),
+              ),
+              child: const Icon(
+                Icons.soup_kitchen,
+                size: 56,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 20),
             Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+              'Tamales POS',
+              style: Theme.of(context).textTheme.headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Sincronizando inventario y pedidos...',
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: Colors.black54),
+            ),
+            const SizedBox(height: 24),
+            const SizedBox(
+              width: 180,
+              child: LinearProgressIndicator(
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+              ),
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+    );
+  }
+}
+
+/// Contenedor principal con barra de navegación inferior de 3 pestañas.
+///
+/// En pantallas de escritorio restringe el ancho máximo a `480 px` para
+/// mantener las proporciones móviles diseñadas para operación con una mano.
+class Shell extends StatefulWidget {
+  /// Crea una instancia de [Shell].
+  const Shell({super.key});
+
+  @override
+  State<Shell> createState() => _ShellState();
+}
+
+class _ShellState extends State<Shell> {
+  /// Índice de la pestaña actualmente visible (`0` Negocio, `1` Pedido, `2` Resumen).
+  int _i = 0;
+
+  /// Títulos mostrados en la barra superior según la pestaña activa.
+  static const List<String> _titulos = ['Negocio', 'Tomar pedido', 'Resumen'];
+
+  /// Color resaltador usado en el indicador de la barra de navegación inferior.
+  static const Color _colorActivo = Color(0xFFD9F99D);
+
+  /// Abre un diálogo modal para editar las tarifas vigentes de público y tienda.
+  Future<void> _ajustes() async {
+    final controller = context.read<PosController>();
+    final actuales = controller.precios;
+
+    final puercoPubCtrl = TextEditingController(
+      text: actuales.puercoPublico.toStringAsFixed(2),
+    );
+    final puercoTndCtrl = TextEditingController(
+      text: actuales.puercoTienda.toStringAsFixed(2),
+    );
+    final elotePubCtrl = TextEditingController(
+      text: actuales.elotePublico.toStringAsFixed(2),
+    );
+    final eloteTndCtrl = TextEditingController(
+      text: actuales.eloteTienda.toStringAsFixed(2),
+    );
+
+    final guardar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ajustar tarifas'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _campoPrecio(puercoPubCtrl, 'Puerco · Público (\$)'),
+              const SizedBox(height: 10),
+              _campoPrecio(puercoTndCtrl, 'Puerco · Tienda (\$)'),
+              const SizedBox(height: 10),
+              _campoPrecio(elotePubCtrl, 'Elote · Público (\$)'),
+              const SizedBox(height: 10),
+              _campoPrecio(eloteTndCtrl, 'Elote · Tienda (\$)'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+
+    if (guardar == true) {
+      controller.actualizarPrecios(
+        ConfiguracionPrecios(
+          puercoPublico:
+              double.tryParse(puercoPubCtrl.text) ?? actuales.puercoPublico,
+          puercoTienda:
+              double.tryParse(puercoTndCtrl.text) ?? actuales.puercoTienda,
+          elotePublico:
+              double.tryParse(elotePubCtrl.text) ?? actuales.elotePublico,
+          eloteTienda:
+              double.tryParse(eloteTndCtrl.text) ?? actuales.eloteTienda,
+        ),
+      );
+    }
+
+    puercoPubCtrl.dispose();
+    puercoTndCtrl.dispose();
+    elotePubCtrl.dispose();
+    eloteTndCtrl.dispose();
+  }
+
+  /// Construye un campo numérico compacto para capturar precios unitarios.
+  Widget _campoPrecio(TextEditingController ctrl, String etiqueta) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: InputDecoration(
+        labelText: etiqueta,
+        isDense: true,
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFEDEDED),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Scaffold(
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              title: Text(_titulos[_i]),
+              actions: [
+                IconButton(
+                  tooltip: 'Ajustes',
+                  icon: const Icon(Icons.settings),
+                  onPressed: _ajustes,
+                ),
+              ],
+            ),
+            body: IndexedStack(
+              index: _i,
+              children: const [
+                OperacionScreen(),
+                TomarPedidoScreen(),
+                ResumenScreen(),
+              ],
+            ),
+            bottomNavigationBar: NavigationBar(
+              selectedIndex: _i,
+              indicatorColor: _colorActivo,
+              onDestinationSelected: (v) => setState(() => _i = v),
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.soup_kitchen_outlined),
+                  selectedIcon: Icon(Icons.soup_kitchen),
+                  label: 'Negocio',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.edit_note_outlined),
+                  selectedIcon: Icon(Icons.edit_note),
+                  label: 'Pedido',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.bar_chart_outlined),
+                  selectedIcon: Icon(Icons.bar_chart),
+                  label: 'Resumen',
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
