@@ -198,7 +198,7 @@ class _TarjetaTicketState extends State<TarjetaTicket> {
 
     // 1. Encabezado comercial
     dibujarCentrado(
-      'TAMALES LUPIN',
+      'TAMALES',
       size: 32,
       weight: FontWeight.w800,
       espacioDespues: 4,
@@ -325,7 +325,7 @@ class _TarjetaTicketState extends State<TarjetaTicket> {
     try {
       final pngBytes = await _generarImagenTicketFormal();
       final folioLimpio = _folioLegible.replaceAll('#', '');
-      final nombreArchivo = 'Ticket_Tamales_Lupin_$folioLimpio.png';
+      final nombreArchivo = 'Ticket_Tamales_$folioLimpio.png';
 
       if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
         final dirDescargas =
@@ -372,7 +372,7 @@ class _TarjetaTicketState extends State<TarjetaTicket> {
   Future<void> _copiarTexto() async {
     final p = widget.pedido;
     final lineas = <String>[
-      'TAMALES LUPIN · Nota de Venta $_folioLegible',
+      'TAMALES · Nota de Venta $_folioLegible',
       'Cliente: ${p.cliente}',
       'Tarifa: ${p.tarifa == TipoTarifa.tienda ? 'Tienda' : 'Público'}',
       'Fecha: ${DateFormat('dd/MM/yyyy HH:mm').format(p.horaRegistro)}',
@@ -418,7 +418,7 @@ class _TarjetaTicketState extends State<TarjetaTicket> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Expanded(child: TituloMarcador('Tamales Lupin')),
+                  const Expanded(child: TituloMarcador('Tamales')),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,

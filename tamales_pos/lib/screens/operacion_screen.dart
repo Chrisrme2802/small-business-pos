@@ -138,7 +138,7 @@ class _OperacionScreenState extends State<OperacionScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         TituloMarcador(
-          'Tamales Lupin',
+          'Tamales',
           trailing: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
             decoration: BoxDecoration(

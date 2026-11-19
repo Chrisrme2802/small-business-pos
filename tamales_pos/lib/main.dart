@@ -20,7 +20,7 @@ Future<void> main() async {
 
   await Supabase.initialize(
     url: 'https://zmzampibkpaiqcgbpoqy.supabase.co',
-    anonKey: 'sb_publishable__CURo0QAxdo6VvDactryww_69hTXrYW',
+    publishableKey: 'sb_publishable__CURo0QAxdo6VvDactryww_69hTXrYW',
   );
 
   runApp(
@@ -218,6 +218,7 @@ class _ShellState extends State<Shell> {
 
   @override
   Widget build(BuildContext context) {
+    final error = context.watch<PosController>().errorConexion;
     return Scaffold(
       backgroundColor: const Color(0xFFEDEDED),
       body: Center(
@@ -236,12 +237,29 @@ class _ShellState extends State<Shell> {
                 ),
               ],
             ),
-            body: IndexedStack(
-              index: _i,
-              children: const [
-                OperacionScreen(),
-                TomarPedidoScreen(),
-                ResumenScreen(),
+            body: Column(
+              children: [
+                if (error != null)
+                  MaterialBanner(
+                    content: Text(error),
+                    actions: [
+                      TextButton(
+                        onPressed: () =>
+                            context.read<PosController>().inicializar(),
+                        child: const Text('Reintentar'),
+                      ),
+                    ],
+                  ),
+                Expanded(
+                  child: IndexedStack(
+                    index: _i,
+                    children: const [
+                      OperacionScreen(),
+                      TomarPedidoScreen(),
+                      ResumenScreen(),
+                    ],
+                  ),
+                ),
               ],
             ),
             bottomNavigationBar: NavigationBar(

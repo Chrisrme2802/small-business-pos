@@ -62,6 +62,17 @@ class PosController extends ChangeNotifier {
     }
   }
 
+  /// Ejecuta una escritura en la nube sin bloquear la UI, reportando fallos.
+  Future<void> _persistir(Future<void> Function() operacion) async {
+    try {
+      await operacion();
+    } catch (e) {
+      debugPrint('Error guardando en Supabase: $e');
+      _errorConexion = 'No se pudo guardar en la nube: $e';
+      notifyListeners();
+    }
+  }
+
   /// Pedidos regulares (incluidos los cancelados de la semana actual)
   /// pertenecientes a la semana abierta o con adeudo activo.
   List<Pedido> get pedidosVisiblesEnOperacion {
@@ -115,7 +126,7 @@ class PosController extends ChangeNotifier {
   void actualizarPrecios(ConfiguracionPrecios nuevosPrecios) {
     _precios = nuevosPrecios;
     notifyListeners();
-    _db.guardarPrecios(_precios);
+    _persistir(() => _db.guardarPrecios(_precios));
   }
 
   /// Reinicia desde cero el inventario del día (limpia ollas activas y
@@ -136,7 +147,7 @@ class PosController extends ChangeNotifier {
       ollasActivas: const [],
     );
     notifyListeners();
-    _db.guardarInventario(_inventario);
+    _persistir(() => _db.guardarInventario(_inventario));
   }
 
   /// Ajusta manualmente las existencias físicas actuales de listos y congelados
@@ -154,7 +165,7 @@ class PosController extends ChangeNotifier {
       eloteCongelados: eloteCongelados.clamp(0, 99999),
     );
     notifyListeners();
-    _db.guardarInventario(_inventario);
+    _persistir(() => _db.guardarInventario(_inventario));
   }
 
   // --- Gestión de ollas en cocción ---
@@ -194,7 +205,7 @@ class PosController extends ChangeNotifier {
       ollasActivas: ollasActualizadas,
     );
     notifyListeners();
-    _db.guardarInventario(_inventario);
+    _persistir(() => _db.guardarInventario(_inventario));
   }
 
   /// Retira una olla específica del carrusel y suma todo su contenido al
@@ -213,7 +224,7 @@ class PosController extends ChangeNotifier {
       ollasActivas: ollasRestantes,
     );
     notifyListeners();
-    _db.guardarInventario(_inventario);
+    _persistir(() => _db.guardarInventario(_inventario));
   }
 
   // --- Gestión de pedidos, entregas, cancelaciones y devoluciones ---
@@ -253,7 +264,7 @@ class PosController extends ChangeNotifier {
     );
 
     _pedidos.add(nuevo);
-    _db.guardarPedido(nuevo);
+    _persistir(() => _db.guardarPedido(nuevo));
 
     if (entregado) {
       _ajustarInventarioPorEntrega(nuevo, entregando: true);
@@ -300,7 +311,7 @@ class PosController extends ChangeNotifier {
     _ajustarInventarioPorEntrega(actual, entregando: nuevoEstado);
     notifyListeners();
 
-    _db.guardarPedido(actualizado);
+    _persistir(() => _db.guardarPedido(actualizado));
     return null;
   }
 
@@ -316,7 +327,7 @@ class PosController extends ChangeNotifier {
     _pedidos[index] = actualizado;
     notifyListeners();
 
-    _db.guardarPedido(actualizado);
+    _persistir(() => _db.guardarPedido(actualizado));
   }
 
   /// Cancela un pedido conservándolo en el historial como `cancelado = true`
@@ -341,7 +352,7 @@ class PosController extends ChangeNotifier {
     _pedidos[index] = cancelado;
     notifyListeners();
 
-    _db.guardarPedido(cancelado);
+    _persistir(() => _db.guardarPedido(cancelado));
   }
 
   /// Registra una devolución de mercancía a nombre de [cliente] sin alterar
@@ -403,8 +414,8 @@ class PosController extends ChangeNotifier {
     }
 
     notifyListeners();
-    _db.guardarPedido(devolucion);
-    _db.guardarInventario(_inventario);
+    _persistir(() => _db.guardarPedido(devolucion));
+    _persistir(() => _db.guardarInventario(_inventario));
   }
 
   /// Descuenta o reintegra tamales cocidos listos al cambiar el estado de entrega.
@@ -434,7 +445,7 @@ class PosController extends ChangeNotifier {
             .clamp(0, 99999),
       );
     }
-    _db.guardarInventario(_inventario);
+    _persistir(() => _db.guardarInventario(_inventario));
   }
 
   // --- Resumen y cuentas por cobrar ---
@@ -477,7 +488,7 @@ class PosController extends ChangeNotifier {
       }
     }
     notifyListeners();
-    _db.guardarVariosPedidos(modificados);
+    _persistir(() => _db.guardarVariosPedidos(modificados));
   }
 
   /// Archiva los movimientos saldados o cancelados de la semana actual bajo
@@ -493,6 +504,6 @@ class PosController extends ChangeNotifier {
       }
     }
     notifyListeners();
-    _db.guardarVariosPedidos(modificados);
+    _persistir(() => _db.guardarVariosPedidos(modificados));
   }
 }
