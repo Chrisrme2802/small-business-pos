@@ -8,6 +8,7 @@ import 'models/configuracion_precios.dart';
 import 'screens/operacion_screen.dart';
 import 'screens/resumen_screen.dart';
 import 'screens/tomar_pedido_screen.dart';
+import 'screens/login_screen.dart';
 import 'widgets/titulo_marcador.dart';
 
 /// Punto de entrada principal de la aplicación **Tamales POS**.
@@ -23,19 +24,17 @@ Future<void> main() async {
     publishableKey: 'sb_publishable__CURo0QAxdo6VvDactryww_69hTXrYW',
   );
 
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => PosController(),
-      child: const TamalesApp(),
-    ),
-  );
+  runApp(const Raiz());
 }
 
 /// Widget raíz que configura el tema Material 3 y alterna entre la pantalla
 /// de carga inicial y la interfaz principal del punto de venta.
 class TamalesApp extends StatelessWidget {
+  /// Maneja login
+  final bool logueado;
+
   /// Crea una instancia de [TamalesApp].
-  const TamalesApp({super.key});
+  const TamalesApp({super.key, required this.logueado});
 
   @override
   Widget build(BuildContext context) {
@@ -47,14 +46,33 @@ class TamalesApp extends StatelessWidget {
         colorSchemeSeed: colorMarcador,
         scaffoldBackgroundColor: Colors.white,
       ),
-      home: Consumer<PosController>(
-        builder: (context, controller, _) {
-          if (controller.estaCargando) {
-            return const _PantallaCarga();
-          }
-          return const Shell();
-        },
-      ),
+      home: !logueado
+          ? const LoginScreen()
+          : Consumer<PosController>(
+              builder: (context, controller, _) {
+                if (controller.estaCargando) return const _PantallaCarga();
+                return const Shell();
+              },
+            ),
+    );
+  }
+}
+
+class Raiz extends StatelessWidget {
+  const Raiz({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<AuthState>(
+      stream: Supabase.instance.client.auth.onAuthStateChange,
+      builder: (context, _) {
+        final logueado = Supabase.instance.client.auth.currentSession != null;
+        if (!logueado) return const TamalesApp(logueado: false);
+        return ChangeNotifierProvider(
+          create: (_) => PosController(),
+          child: const TamalesApp(logueado: true),
+        );
+      },
     );
   }
 }
@@ -234,6 +252,11 @@ class _ShellState extends State<Shell> {
                   tooltip: 'Ajustes',
                   icon: const Icon(Icons.settings),
                   onPressed: _ajustes,
+                ),
+                IconButton(
+                  tooltip: 'Cerrar sesión',
+                  icon: const Icon(Icons.logout),
+                  onPressed: () => Supabase.instance.client.auth.signOut(),
                 ),
               ],
             ),

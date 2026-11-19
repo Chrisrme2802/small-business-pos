@@ -26,6 +26,7 @@ class _TomarPedidoScreenState extends State<TomarPedidoScreen> {
   int _cantElote = 0;
   Pedido? _creado;
   int _formKey = 0;
+  bool _gratis = false;
 
   static const Color _colorMarcador = Color(0xFFD9F99D);
 
@@ -63,6 +64,7 @@ class _TomarPedidoScreenState extends State<TomarPedidoScreen> {
       cantidadPuerco: _cantPuerco,
       cantidadElote: _cantElote,
       horaEntrega: entrega,
+      gratis: _gratis,
     );
     setState(() => _creado = pedido);
   }
@@ -76,6 +78,7 @@ class _TomarPedidoScreenState extends State<TomarPedidoScreen> {
     _inmediato = true;
     _hora = null;
     _formKey++;
+    _gratis = false;
   });
 
   @override
@@ -144,6 +147,13 @@ class _TomarPedidoScreenState extends State<TomarPedidoScreen> {
           onSelectionChanged: (s) => setState(() => _tarifa = s.first),
         ),
         const SizedBox(height: 16),
+        FilterChip(
+          avatar: const Icon(Icons.card_giftcard, size: 18),
+          label: const Text('Gratis'),
+          selected: _gratis,
+          selectedColor: colorActivo,
+          onSelected: (v) => setState(() => _gratis = v),
+        ),
 
         const Text('Hora', style: TextStyle(fontWeight: FontWeight.w700)),
         const SizedBox(height: 6),

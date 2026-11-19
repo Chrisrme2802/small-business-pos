@@ -75,6 +75,10 @@ class _TarjetaTicketState extends State<TarjetaTicket> {
     return '#${limpio.substring(limpio.length - 8)}';
   }
 
+  /// Revisa si es gratis y si no manda el valor normal
+  String _importe(double valor) =>
+      widget.pedido.esGratis ? 'GRATIS' : _moneda.format(valor);
+
   /// Dibuja en memoria mediante [ui.PictureRecorder] un ticket formal tipo
   /// impresora térmica de tienda (fondo blanco, tipografía monoespaciada,
   /// columnas alineadas y totales) y lo devuelve como bytes PNG.
@@ -127,7 +131,9 @@ class _TarjetaTicketState extends State<TarjetaTicket> {
     final tarifaTexto = p.tarifa == TipoTarifa.tienda ? 'TIENDA' : 'PÚBLICO';
     final estadoPago = p.cancelado
         ? 'CANCELADO'
-        : (p.pagado ? 'PAGADO' : 'PENDIENTE DE PAGO');
+        : (p.esGratis
+              ? 'CORTESÍA'
+              : (p.pagado ? 'PAGADO' : 'PENDIENTE DE PAGO'));
 
     double altoTotal = 460;
     if (p.cantidadPuerco > 0) altoTotal += 62;
@@ -244,13 +250,13 @@ class _TarjetaTicketState extends State<TarjetaTicket> {
     if (p.cantidadPuerco > 0) {
       dibujarFila(
         '${p.cantidadPuerco.toString().padLeft(2)} × Tamal de puerco',
-        _moneda.format(subtotalPuerco),
+        _importe(subtotalPuerco),
         size: 20,
         weight: FontWeight.w700,
         espacioDespues: 2,
       );
       dibujarFila(
-        '     Precio unitario: ${_moneda.format(p.precioPuercoAplicado)}',
+        '     Precio unitario: ${_importe(p.precioPuercoAplicado)}',
         '',
         size: 16,
         color: const Color(0xFF4B5563),
@@ -261,13 +267,13 @@ class _TarjetaTicketState extends State<TarjetaTicket> {
     if (p.cantidadElote > 0) {
       dibujarFila(
         '${p.cantidadElote.toString().padLeft(2)} × Tamal de elote',
-        _moneda.format(subtotalElote),
+        _importe(subtotalElote),
         size: 20,
         weight: FontWeight.w700,
         espacioDespues: 2,
       );
       dibujarFila(
-        '     Precio unitario: ${_moneda.format(p.precioEloteAplicado)}',
+        '     Precio unitario: ${_importe(p.precioEloteAplicado)}',
         '',
         size: 16,
         color: const Color(0xFF4B5563),
@@ -287,7 +293,7 @@ class _TarjetaTicketState extends State<TarjetaTicket> {
     );
     dibujarFila(
       'TOTAL A PAGAR:',
-      _moneda.format(p.totalPesos),
+      _importe(p.totalPesos),
       size: 26,
       weight: FontWeight.w800,
       espacioDespues: 16,
@@ -379,11 +385,11 @@ class _TarjetaTicketState extends State<TarjetaTicket> {
       'Estatus: ${p.cancelado ? 'CANCELADO' : (p.pagado ? 'Pagado' : 'Por cobrar')}',
       '---',
       if (p.cantidadPuerco > 0)
-        '${p.cantidadPuerco} × Tamal de puerco (${_moneda.format(p.precioPuercoAplicado)} c/u) = ${_moneda.format(p.cantidadPuerco * p.precioPuercoAplicado)}',
+        '${p.cantidadPuerco} × Tamal de puerco (${_importe(p.precioPuercoAplicado)} c/u) = ${_importe(p.cantidadPuerco * p.precioPuercoAplicado)}',
       if (p.cantidadElote > 0)
-        '${p.cantidadElote} × Tamal de elote (${_moneda.format(p.precioEloteAplicado)} c/u) = ${_moneda.format(p.cantidadElote * p.precioEloteAplicado)}',
+        '${p.cantidadElote} × Tamal de elote (${_importe(p.precioEloteAplicado)} c/u) = ${_importe(p.cantidadElote * p.precioEloteAplicado)}',
       '---',
-      'TOTAL (${p.totalPiezas} pzas): ${_moneda.format(p.totalPesos)}',
+      'TOTAL (${p.totalPiezas} pzas): ${_importe(p.totalPesos)}',
     ];
 
     await Clipboard.setData(ClipboardData(text: lineas.join('\n')));
@@ -527,7 +533,7 @@ class _TarjetaTicketState extends State<TarjetaTicket> {
                     ],
                   ),
                   Text(
-                    _moneda.format(pedido.totalPesos),
+                    _importe(pedido.totalPesos),
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 22,
@@ -647,14 +653,14 @@ class _TarjetaTicketState extends State<TarjetaTicket> {
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               Text(
-                '${_moneda.format(precioUnitario)} c/u',
+                '${_importe(precioUnitario)} c/u',
                 style: const TextStyle(fontSize: 12, color: Colors.black54),
               ),
             ],
           ),
         ),
         Text(
-          _moneda.format(subtotal),
+          _importe(subtotal),
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
       ],

@@ -93,6 +93,9 @@ class Pedido {
     return esDevolucion ? -importeBruto : importeBruto;
   }
 
+  /// Indica si el pedido es una cortesía (precios aplicados en cero).
+  bool get esGratis => precioPuercoAplicado == 0 && precioEloteAplicado == 0;
+
   /// Devuelve una copia modificando únicamente los campos especificados.
   Pedido copyWith({
     String? id,

@@ -239,13 +239,18 @@ class PosController extends ChangeNotifier {
     DateTime? horaEntrega,
     bool entregado = false,
     bool pagado = false,
+    bool gratis = false,
   }) {
-    final precioPuerco = tarifa == TipoTarifa.tienda
-        ? _precios.puercoTienda
-        : _precios.puercoPublico;
-    final precioElote = tarifa == TipoTarifa.tienda
-        ? _precios.eloteTienda
-        : _precios.elotePublico;
+    final precioPuerco = gratis
+        ? 0.0
+        : (tarifa == TipoTarifa.tienda
+              ? _precios.puercoTienda
+              : _precios.puercoPublico);
+    final precioElote = gratis
+        ? 0.0
+        : (tarifa == TipoTarifa.tienda
+              ? _precios.eloteTienda
+              : _precios.elotePublico);
 
     final ahora = DateTime.now();
     final nuevo = Pedido(

@@ -89,7 +89,9 @@ class TarjetaPedido extends StatelessWidget {
                   Text(
                     pedido.cancelado
                         ? 'Cancelado'
-                        : _moneda.format(pedido.totalPesos),
+                        : (pedido.esGratis
+                              ? 'Gratis'
+                              : _moneda.format(pedido.totalPesos)),
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       color: pedido.cancelado ? Colors.red.shade700 : null,
