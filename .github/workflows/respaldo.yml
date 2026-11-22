@@ -1,0 +1,25 @@
+name: Respaldo Supabase
+
+on:
+  schedule:
+    - cron: "0 9 * * *"   # 09:00 UTC = 02:00 en Sinaloa
+  workflow_dispatch:       # permite lanzarlo a mano desde la pestaña Actions
+
+jobs:
+  respaldo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Descargar tablas
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python3 scripts/respaldo.py
+
+      - name: Guardar respaldo (90 días)
+        uses: actions/upload-artifact@v4
+        with:
+          name: respaldo-supabase
+          path: respaldo_*
+          retention-days: 90
