@@ -6,8 +6,8 @@ las tres tablas de la app y las guarda en una carpeta ``respaldo_AAAA-MM-DD``.
 Usa solo la biblioteca estándar de Python, sin dependencias.
 
 Variables de entorno requeridas:
-    SUPABASE_URL
-    SUPABASE_SERVICE_KEY
+    SUPABASE_URL         
+    SUPABASE_SERVICE_KEY 
                           Se salta RLS, así que NUNCA va dentro de la app.
 """
 import datetime
@@ -15,12 +15,31 @@ import json
 import os
 import pathlib
 import sys
+import urllib.error
 import urllib.request
 
-URL = os.environ["SUPABASE_URL"].rstrip("/")
-KEY = os.environ["SUPABASE_SERVICE_KEY"]
+URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+KEY = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
 TABLAS = ["configuracion_precios", "inventario_actual", "pedidos"]
 PAGINA = 1000
+
+
+def validar_entorno() -> None:
+    """Detiene el script con un mensaje claro si los secretos son incorrectos."""
+    if not URL or not KEY:
+        sys.exit(
+            "Faltan secretos en GitHub -> "
+            f"SUPABASE_URL: {'ok' if URL else 'VACÍO'} | "
+            f"SUPABASE_SERVICE_KEY: {'ok' if KEY else 'VACÍO'} "
+            "(revisa que el nombre esté escrito exactamente igual)."
+        )
+    if not KEY.startswith(("sb_secret_", "eyJ")):
+        # Solo se imprime el prefijo, que no es sensible.
+        sys.exit(
+            f"La clave guardada empieza con '{KEY[:12]}...' y no parece una clave "
+            "secreta (debe empezar con 'sb_secret_')."
+        )
+    print(f"Proyecto: {URL} | clave: {KEY[:10]}... ({len(KEY)} caracteres)")
 
 
 def encabezados() -> dict:
@@ -41,8 +60,12 @@ def descargar(tabla: str) -> list:
             f"&limit={PAGINA}&offset={desde}"
         )
         req = urllib.request.Request(endpoint, headers=encabezados())
-        with urllib.request.urlopen(req, timeout=60) as r:
-            pagina = json.load(r)
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                pagina = json.load(r)
+        except urllib.error.HTTPError as e:
+            cuerpo = e.read().decode("utf-8", "replace")
+            sys.exit(f"Error HTTP {e.code} al leer '{tabla}': {cuerpo}")
         filas.extend(pagina)
         if len(pagina) < PAGINA:
             return filas
@@ -50,6 +73,7 @@ def descargar(tabla: str) -> list:
 
 
 def main() -> None:
+    validar_entorno()
     carpeta = pathlib.Path(f"respaldo_{datetime.date.today().isoformat()}")
     carpeta.mkdir(exist_ok=True)
     for tabla in TABLAS:
