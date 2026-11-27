@@ -11,17 +11,24 @@ import 'screens/tomar_pedido_screen.dart';
 import 'screens/login_screen.dart';
 import 'widgets/titulo_marcador.dart';
 
+/// Variables de entorno
+const _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+const _supabaseKey = String.fromEnvironment('SUPABASE_KEY');
+
+const esProduccion = String.fromEnvironment('ENTORNO') == 'prod';
+
 /// Punto de entrada principal de la aplicación **Tamales POS**.
-///
 /// Inicializa el formato regional en español de México (`es_MX`), conecta el
 /// cliente de Supabase e inyecta una instancia global de [PosController].
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es_MX');
 
+  assert(_supabaseUrl.isNotEmpty, 'Falta --dart-define-from-file=env/dev.json');
+
   await Supabase.initialize(
-    url: 'https://zmzampibkpaiqcgbpoqy.supabase.co',
-    publishableKey: 'sb_publishable__CURo0QAxdo6VvDactryww_69hTXrYW',
+    url: _supabaseUrl,
+    publishableKey: _supabaseKey,
   );
 
   runApp(const Raiz());
@@ -244,9 +251,9 @@ class _ShellState extends State<Shell> {
           constraints: const BoxConstraints(maxWidth: 480),
           child: Scaffold(
             appBar: AppBar(
-              backgroundColor: Colors.white,
+              backgroundColor: esProduccion ? Colors.white : Colors.red.shade100,
               surfaceTintColor: Colors.transparent,
-              title: Text(_titulos[_i]),
+              title: Text(esProduccion ? _titulos[_i] : '${_titulos[_i]} · PRUEBAS'),
               actions: [
                 IconButton(
                   tooltip: 'Ajustes',

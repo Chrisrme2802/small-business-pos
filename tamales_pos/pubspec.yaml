@@ -102,3 +102,10 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+scripts:
+  dev: flutter run --dart-define-from-file=env/dev.json
+  dev:win: flutter run -d windows --dart-define-from-file=env/dev.json
+  dev:linux: flutter run -d linux --dart-define-from-file=env/dev.json
+  apk: flutter build apk --release --dart-define-from-file=env/prod.json
+  web: flutter build web --release --dart-define-from-file=env/prod.json
