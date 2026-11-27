@@ -692,7 +692,7 @@ class _DiaTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final nombreDia = toBeginningOfSentenceCase(
       DateFormat('EEEE', 'es_MX').format(DateTime(2024, 1, dia)),
-    )!;
+    );
     final porHora = <int, List<Pedido>>{};
     for (final x in pedidos) {
       porHora.putIfAbsent(x.horaRegistro.hour, () => []).add(x);

@@ -60,6 +60,13 @@ class Pedido {
   /// con impacto monetario cero (`0.0`).
   final bool cancelado;
 
+  /// Total acordado que sustituye al calculado por piezas (precio especial,
+  /// por ejemplo para familiares). `null` si el pedido usa los precios normales.
+  final double? precioEspecial;
+
+  /// Motivo del regalo (Tienda, Cliente, Familia o texto propio); `null` si no es regalo.
+  final String? motivoRegalo;
+
   /// Crea una instancia inmutable de [Pedido].
   const Pedido({
     required this.id,
@@ -77,15 +84,25 @@ class Pedido {
     this.semanaId = 'actual',
     this.esDevolucion = false,
     this.cancelado = false,
+    this.precioEspecial,
+    this.motivoRegalo,
   });
 
   /// Suma total de piezas incluidas en el movimiento.
   int get totalPiezas => cantidadPuerco + cantidadElote;
 
-  /// Importe monetario bruto de las piezas (`>= 0`).
-  double get importeBruto =>
+  /// Suma de piezas por sus precios aplicados, **ignorando** cualquier
+  /// [precioEspecial]. Sirve para mostrar el total original tachado.
+  double get totalCalculado =>
       (cantidadPuerco * precioPuercoAplicado) +
       (cantidadElote * precioEloteAplicado);
+
+  /// Indica si el pedido tiene un precio especial acordado.
+  bool get tienePrecioEspecial => precioEspecial != null;
+
+  /// Importe monetario bruto del movimiento (`>= 0`): el [precioEspecial] si
+  /// existe; de lo contrario, el [totalCalculado] por piezas.
+  double get importeBruto => precioEspecial ?? totalCalculado;
 
   /// Impacto monetario neto (`0.0` si está [cancelado], negativo si [esDevolucion]).
   double get totalPesos {
@@ -97,6 +114,9 @@ class Pedido {
   bool get esGratis => precioPuercoAplicado == 0 && precioEloteAplicado == 0;
 
   /// Devuelve una copia modificando únicamente los campos especificados.
+  ///
+  /// Los parámetros `limpiar...` permiten volver a `null` un campo opcional,
+  /// algo que no se puede expresar pasando `null` directamente.
   Pedido copyWith({
     String? id,
     String? cliente,
@@ -115,6 +135,9 @@ class Pedido {
     String? semanaId,
     bool? esDevolucion,
     bool? cancelado,
+    double? precioEspecial,
+    bool limpiarPrecioEspecial = false,
+    String? motivoRegalo,
   }) {
     return Pedido(
       id: id ?? this.id,
@@ -136,6 +159,10 @@ class Pedido {
       semanaId: semanaId ?? this.semanaId,
       esDevolucion: esDevolucion ?? this.esDevolucion,
       cancelado: cancelado ?? this.cancelado,
+      precioEspecial: limpiarPrecioEspecial
+          ? null
+          : (precioEspecial ?? this.precioEspecial),
+      motivoRegalo: motivoRegalo ?? this.motivoRegalo,
     );
   }
 
@@ -157,10 +184,15 @@ class Pedido {
       'semanaId': semanaId,
       'esDevolucion': esDevolucion,
       'cancelado': cancelado,
+      'precioEspecial': precioEspecial,
+      'motivoRegalo': motivoRegalo,
     };
   }
 
   /// Reconstruye un [Pedido] a partir de un mapa proveniente de Supabase.
+  ///
+  /// Los pedidos guardados antes de existir el precio especial no traen esa
+  /// clave y se cargan con `precioEspecial == null`.
   factory Pedido.fromMap(Map<String, dynamic> map) {
     return Pedido(
       id: map['id'] ?? '',
@@ -185,6 +217,8 @@ class Pedido {
       semanaId: map['semanaId'] ?? 'actual',
       esDevolucion: map['esDevolucion'] ?? false,
       cancelado: map['cancelado'] ?? false,
+      precioEspecial: (map['precioEspecial'] as num?)?.toDouble(),
+      motivoRegalo: map['motivoRegalo'] as String?,
     );
   }
 }

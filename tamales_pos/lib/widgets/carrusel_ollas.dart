@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -39,6 +40,15 @@ class _CarruselOllasState extends State<CarruselOllas> {
     _timer?.cancel();
     _page.dispose();
     super.dispose();
+  }
+
+  /// Texto con la hora en que terminó la cocción y cuántos minutos han pasado.
+  String _textoTermino(DateTime horaFin) {
+    final hace = DateTime.now().difference(horaFin).inMinutes;
+    final hora = DateFormat.Hm().format(horaFin);
+    return hace <= 0
+        ? 'Terminó a las $hora'
+        : 'Terminó a las $hora (hace $hace min)';
   }
 
   String _mmss(Duration d) {
@@ -242,6 +252,14 @@ class _CarruselOllasState extends State<CarruselOllas> {
                                             : null,
                                       ),
                                 ),
+                                if (o.estaLista)
+                                  Text(
+                                    _textoTermino(o.horaFin),
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: Colors.green.shade700,
+                                        ),
+                                  ),
                                 Align(
                                   alignment: Alignment.centerLeft,
                                   child: TextButton(

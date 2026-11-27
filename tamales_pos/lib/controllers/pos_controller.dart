@@ -41,6 +41,12 @@ class PosController extends ChangeNotifier {
   /// Lista completa de movimientos registrados (pedidos, devoluciones y cancelados).
   List<Pedido> get todosLosPedidos => List.unmodifiable(_pedidos);
 
+  /// Precios unitarios vigentes según la tarifa.
+  ({double puerco, double elote}) _preciosVigentes(TipoTarifa tarifa) =>
+      tarifa == TipoTarifa.tienda
+      ? (puerco: _precios.puercoTienda, elote: _precios.eloteTienda)
+      : (puerco: _precios.puercoPublico, elote: _precios.elotePublico);
+
   /// Descarga las tarifas, el inventario y todos los movimientos desde Supabase.
   Future<void> inicializar() async {
     _estaCargando = true;
@@ -240,17 +246,11 @@ class PosController extends ChangeNotifier {
     bool entregado = false,
     bool pagado = false,
     bool gratis = false,
+    String? motivoRegalo,
   }) {
-    final precioPuerco = gratis
-        ? 0.0
-        : (tarifa == TipoTarifa.tienda
-              ? _precios.puercoTienda
-              : _precios.puercoPublico);
-    final precioElote = gratis
-        ? 0.0
-        : (tarifa == TipoTarifa.tienda
-              ? _precios.eloteTienda
-              : _precios.elotePublico);
+    final vigentes = _preciosVigentes(tarifa);
+    final precioPuerco = gratis ? 0.0 : vigentes.puerco;
+    final precioElote = gratis ? 0.0 : vigentes.elote;
 
     final ahora = DateTime.now();
     final nuevo = Pedido(
@@ -265,7 +265,12 @@ class PosController extends ChangeNotifier {
       horaEntrega: horaEntrega,
       horaEntregadoReal: entregado ? ahora : null,
       entregado: entregado,
-      pagado: pagado,
+      pagado: gratis ? true : pagado,
+      motivoRegalo: !gratis
+          ? null
+          : ((motivoRegalo?.trim().isNotEmpty ?? false)
+                ? motivoRegalo!.trim()
+                : 'Regalo'),
     );
 
     _pedidos.add(nuevo);
@@ -328,6 +333,8 @@ class PosController extends ChangeNotifier {
     final actual = _pedidos[index];
     if (actual.cancelado) return;
 
+    if (actual.cancelado || actual.esGratis) return;
+
     final actualizado = actual.copyWith(pagado: !actual.pagado);
     _pedidos[index] = actualizado;
     notifyListeners();
@@ -360,6 +367,99 @@ class PosController extends ChangeNotifier {
     _persistir(() => _db.guardarPedido(cancelado));
   }
 
+  /// Edita un pedido que aún no ha sido entregado ni cobrado.
+  ///
+  /// Conserva los precios con que se creó el pedido; solo si cambia la tarifa se
+  /// recalculan con las tarifas vigentes (los regalos conservan precio cero).
+  /// Si cambian las piezas o la tarifa se quita el precio especial. Como el
+  /// pedido todavía no se entrega, el inventario no se modifica.
+  ///
+  /// Devuelve `null` si todo salió bien o un mensaje descriptivo si no se pudo.
+  String? editarPedido(
+    String pedidoId, {
+    required String cliente,
+    required TipoTarifa tarifa,
+    required int cantidadPuerco,
+    required int cantidadElote,
+    DateTime? horaEntrega,
+  }) {
+    final index = _pedidos.indexWhere((p) => p.id == pedidoId);
+    if (index == -1) return 'No se encontró el pedido.';
+
+    final actual = _pedidos[index];
+    if (actual.cancelado || actual.esDevolucion) {
+      return 'Este pedido no se puede editar.';
+    }
+    if (actual.entregado) return 'Ya fue entregado: no se puede editar.';
+    if (actual.pagado) return 'Ya fue cobrado: no se puede editar.';
+    if (cantidadPuerco + cantidadElote <= 0) {
+      return 'El pedido debe tener al menos una pieza.';
+    }
+
+    final cambioTarifa = tarifa != actual.tarifa;
+    final cambioPiezas =
+        cantidadPuerco != actual.cantidadPuerco ||
+        cantidadElote != actual.cantidadElote;
+
+    // Solo se repreciaría con tarifas nuevas si cambió la tarifa y no es regalo.
+    final repreciar = cambioTarifa && !actual.esGratis;
+    final vigentes = _preciosVigentes(tarifa);
+
+    final editado = actual.copyWith(
+      cliente: cliente.trim().isEmpty ? 'Mostrador' : cliente.trim(),
+      tarifa: tarifa,
+      cantidadPuerco: cantidadPuerco,
+      cantidadElote: cantidadElote,
+      precioPuercoAplicado: repreciar ? vigentes.puerco : null,
+      precioEloteAplicado: repreciar ? vigentes.elote : null,
+      horaEntrega: horaEntrega,
+      limpiarHoraEntrega: horaEntrega == null,
+      limpiarPrecioEspecial: cambioPiezas || cambioTarifa,
+    );
+
+    _pedidos[index] = editado;
+    notifyListeners();
+    _persistir(() => _db.guardarPedido(editado));
+    return null;
+  }
+
+  /// Fija, cambia o quita el precio especial (total acordado) de un pedido.
+  ///
+  /// Se permite mientras el pedido no esté cobrado ni cancelado. Pasar
+  /// [nuevoTotal] en `null` quita el precio especial.
+  ///
+  /// Devuelve `null` si todo salió bien o un mensaje descriptivo si no se pudo.
+  String? fijarPrecioEspecial(String pedidoId, double? nuevoTotal) {
+    final index = _pedidos.indexWhere((p) => p.id == pedidoId);
+    if (index == -1) return 'No se encontró el pedido.';
+
+    final actual = _pedidos[index];
+    if (actual.cancelado || actual.esDevolucion) {
+      return 'Este pedido no admite precio especial.';
+    }
+    if (actual.esGratis) return 'Un regalo no admite precio especial.';
+    if (actual.pagado) return 'Ya fue cobrado: no se puede cambiar el precio.';
+    if (nuevoTotal != null && nuevoTotal <= 0) {
+      return 'El precio debe ser mayor que cero (para regalos usa Gratis).';
+    }
+
+    // Si coincide con el total calculado, equivale a no tener precio especial.
+    final fijo =
+        (nuevoTotal == null ||
+            (nuevoTotal - actual.totalCalculado).abs() < 0.005)
+        ? null
+        : nuevoTotal;
+
+    final actualizado = actual.copyWith(
+      precioEspecial: fijo,
+      limpiarPrecioEspecial: fijo == null,
+    );
+    _pedidos[index] = actualizado;
+    notifyListeners();
+    _persistir(() => _db.guardarPedido(actualizado));
+    return null;
+  }
+
   /// Registra una devolución de mercancía a nombre de [cliente] sin alterar
   /// sus pedidos originales, descontando su importe de su cuenta por cobrar
   /// y reingresando las piezas a congelado o listo (caliente).
@@ -377,16 +477,10 @@ class PosController extends ChangeNotifier {
     final ultimoPedido = pedidosCliente.isNotEmpty ? pedidosCliente.last : null;
 
     final tarifaAplicada = ultimoPedido?.tarifa ?? TipoTarifa.tienda;
-    final precioPuerco =
-        ultimoPedido?.precioPuercoAplicado ??
-        (tarifaAplicada == TipoTarifa.tienda
-            ? _precios.puercoTienda
-            : _precios.puercoPublico);
-    final precioElote =
-        ultimoPedido?.precioEloteAplicado ??
-        (tarifaAplicada == TipoTarifa.tienda
-            ? _precios.eloteTienda
-            : _precios.elotePublico);
+
+    final vigentes = _preciosVigentes(tarifaAplicada);
+    final precioPuerco = ultimoPedido?.precioPuercoAplicado ?? vigentes.puerco;
+    final precioElote = ultimoPedido?.precioEloteAplicado ?? vigentes.elote;
 
     final ahora = DateTime.now();
     final devolucion = Pedido(
